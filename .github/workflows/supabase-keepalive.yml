@@ -1,0 +1,46 @@
+# Supabase Keep-Alive
+#
+# Free Supabase projects are paused after ~7 days without activity. This workflow
+# sends one lightweight read to your database every day so the project stays awake.
+#
+# ── SETUP ────────────────────────────────────────────────────────────────
+# 1. Put this file in your repo at:  .github/workflows/supabase-keepalive.yml
+# 2. In your GitHub repo: Settings → Secrets and variables → Actions → New repository secret
+#      SUPABASE_URL       =  https://jfkmahfpliofdqnskivm.supabase.co
+#      SUPABASE_ANON_KEY  =  sb_publishable_aUAWt9JPQDugIFhk4B_cXA_sDeWem71
+# 3. Commit. It runs automatically every day, and you can also run it manually
+#    from the Actions tab (the "Run workflow" button).
+#
+# NOTE: GitHub disables scheduled workflows if the repository has NO activity for
+# 60 days. Push a small commit occasionally (or use the manual "Run workflow"
+# button) to keep the schedule itself alive.
+
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    - cron: '17 6 * * *'   # every day at 06:17 UTC
+  workflow_dispatch:        # allows manual runs from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST endpoint
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "Pinging $SUPABASE_URL ..."
+          code=$(curl -s -o /tmp/resp.txt -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/chronology?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+          echo "HTTP status: $code"
+          echo "Response: $(cat /tmp/resp.txt)"
+          if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
+            echo "✅ Keep-alive succeeded — project is active."
+          else
+            echo "❌ Keep-alive failed (HTTP $code)."
+            exit 1
+          fi
